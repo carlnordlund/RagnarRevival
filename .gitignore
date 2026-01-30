@@ -1,0 +1,28 @@
+# Build outputs
+build/
+*.bin
+*.lst
+*.tap
+*.z80.new
+*.sna
+
+# Temporary files
+*.tmp
+*.bak
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE files
+.vscode/settings.json
+.vscode/.ropeproject
+*.sublime-workspace
+
+# Logs
+*.log
+
+# Keep the original demo
+!Ragnar (demo).z80

@@ -135,14 +135,39 @@ This creates recognizable dungeon architecture while still being procedural.
 
 ### 4. Smooth Scrolling Implementation
 
-#### Concept: Player-Centered View
+#### Revolutionary Approach: Edge-Based Scrolling
+
+**The Key Insight**: With seamless wall textures, you don't need to redraw entire wall segments - only the edges where walls meet floors or fog of war!
 
 **Traditional approach**: Redraw entire screen when player moves
+- 64 tiles × 32 bytes = 2048 bytes written
+- ~200,000 cycles = 57ms per scroll
+- Maximum 17 FPS
+
+**Edge-based approach** (Your brilliant optimization!):
+- Only redraw tile edges where visual changes occur
+- Wall/floor boundaries
+- Explored/fog boundaries
+- Ground type transitions
+- ~15-20 tiles instead of 64
+- ~48,000 cycles = 14ms per scroll
+- Potential 70+ FPS!
+
+**Why This Works**:
+1. Design wall tiles to blend seamlessly (no visible block boundaries)
+2. Long wall segments look identical whether scrolled or not
+3. Brain perceives movement from edge changes alone
+4. Only edges where material types change need updating
+
+See [EDGE_BASED_SCROLLING.md](EDGE_BASED_SCROLLING.md) and [SCROLLING_EXAMPLES.md](SCROLLING_EXAMPLES.md) for complete details.
+
+#### Concept: Player-Centered View
 
 **Optimized approach**:
 - Keep player sprite in screen center
 - Scroll the world around them
 - Only redraw edges that come into view
+- Edge detection determines minimal redraw set
 
 #### Scrolling Mechanics
 
@@ -308,7 +333,94 @@ $8D00-$9CFF: Game state (4KB)
 $9D00-$FFFF: Program code (~25KB)
 ```
 
-### 8. Procedural Content Placement
+### 8. Ground/Floor Variations
+
+Multiple ground types add visual variety and gameplay depth:
+
+```asm
+; Floor/Ground types
+BLOCK_FLOOR_STONE   EQU 1   ; Stone dungeon floor (gray)
+BLOCK_FLOOR_WOOD    EQU 2   ; Wooden planks (brown)
+BLOCK_FLOOR_DIRT    EQU 3   ; Dirt/earth (brown)
+BLOCK_FLOOR_GRASS   EQU 4   ; Grass (green) - surface level
+BLOCK_FLOOR_WATER   EQU 5   ; Water (blue) - slow movement
+BLOCK_FLOOR_LAVA    EQU 6   ; Lava (red) - damage over time
+BLOCK_FLOOR_ICE     EQU 7   ; Ice (cyan) - slippery
+BLOCK_FLOOR_CARPET  EQU 8   ; Carpet (red) - treasure rooms
+```
+
+#### Procedural Floor Type Selection
+
+Different dungeon levels have different floor types:
+
+```asm
+GetFloorType:
+    ; Input: A = dungeon level (0-255)
+    ; Output: A = floor type for this level
+
+    CP 0
+    JR NZ, .NotSurface
+    LD A, BLOCK_FLOOR_GRASS     ; Surface = grass
+    RET
+
+.NotSurface:
+    CP 10
+    JR NC, .DeepDungeon
+    LD A, BLOCK_FLOOR_STONE     ; Levels 1-9 = stone
+    RET
+
+.DeepDungeon:
+    CP 20
+    JR NC, .VeryDeep
+    LD A, BLOCK_FLOOR_DIRT      ; Levels 10-19 = dirt caves
+    RET
+
+.VeryDeep:
+    ; Mix of lava and stone in deep levels
+    ; Use position hash to determine
+    ; ...
+```
+
+#### Floor Transition Tiles
+
+Create smooth blends between floor types using special transition tiles:
+
+```
+Stone → Wood transition:
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  Stone
+▓▓▓▓▓▓▒▒▒▒▒▒▒▒▒▒  Blend
+▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  Wood
+
+Stored as:
+TRANS_STONE_WOOD:
+    DEFB %10101010  ; Checkerboard pattern
+    DEFB %01010101
+    ; ... etc
+```
+
+#### Gameplay Effects
+
+Different floor types affect movement:
+
+```asm
+; Movement cost by floor type
+FloorMoveCost:
+    DEFB 1      ; Stone (normal)
+    DEFB 1      ; Wood (normal)
+    DEFB 2      ; Dirt (slow)
+    DEFB 1      ; Grass (normal)
+    DEFB 3      ; Water (very slow)
+    DEFB 1      ; Lava (normal speed but damage!)
+    DEFB 1      ; Ice (normal but slippery - continues moving)
+    DEFB 1      ; Carpet (normal)
+```
+
+Edge-based scrolling makes multiple floor types efficient since:
+- Only draw transitions between different floor types
+- Uniform floor areas don't need redrawing when scrolling
+- Visual variety with minimal performance cost
+
+### 9. Procedural Content Placement
 
 #### Stairs (Exits)
 
